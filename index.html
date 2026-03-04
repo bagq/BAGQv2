@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="eng">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BAG-Q</title>
+
+    <style>
+
+        #mainHeader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background-color: #f2f2f2;  /* light gray */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 25px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            z-index: 2000;
+        }
+
+        #mainHeader .right-section button,
+        #mainHeader .right-section a {
+            margin-left: 30px;
+        }
+
+        #mainHeader .left-section {
+            margin-left: 30px;
+        }
+
+        #mainHeader .right-section {
+            margin-right: 30px;
+        }
+
+        #mainHeader .right-section a,
+        #mainHeader .right-section button {
+            margin-left: 20px;
+        }
+
+        #jeepSidebar {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            left: -340px;
+            width: 280px;
+            max-height: 75vh;
+            overflow-y: auto;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+            z-index: 1500;
+            transition: left 0.4s ease;
+        }
+
+        #jeepSidebar.show {
+            left: 20px;
+        }
+
+        #jeepList {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        #map {
+            height: calc(100vh - 60px);
+            margin-top: 60px;
+        }
+
+        #searchContainer {
+            position: absolute;
+            top: 70px;
+            left: 60px;
+            z-index: 2100;
+            width: 280px;
+        }
+
+        .jeep-card {
+            display: flex;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        .jeep-card img {
+            width: 40px;
+            height: 40px;
+            margin-right: 12px;
+        }
+
+        .jeep-info {
+            font-size: 14px;
+        }
+
+        #accountSidebar {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 300px;
+            height: 100vh;
+            background-color: #f8f9fa;
+            border-left: 1px solid #dee2e6;
+            padding: 20px;
+            transition: right 0.3s ease;
+            z-index: 1100;
+        }
+
+        #accountSidebar.show { right: 0; }
+
+        .sidebar-header { border-bottom: 1px solid #dee2e6; padding-bottom: 10px; margin-bottom: 20px; }
+        .sidebar-content { margin-bottom: 20px; }
+        .sidebar-footer { position: absolute; bottom: 20px; width: calc(100% - 40px); }
+    </style>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+</head>
+
+<body>
+
+    <!-- SEARCH BAR -->
+    <div id="searchContainer">
+        <input type="text" class="form-control" id="terminalSearch" placeholder="Search jeepney terminal...">
+        <ul class="list-group mt-1" id="suggestions"></ul>
+    </div>
+
+    <!-- HEADER -->
+    <div id="mainHeader">
+        <div class="left-section">
+            <strong>BAG-Q</strong>
+        </div>
+
+        <div class="right-section">
+            <a href="driver.html" class="btn btn-outline-dark btn-sm">Driver</a>
+            <a href="login.html" class="btn btn-outline-dark btn-sm">Login</a>
+            <a href="register.html" class="btn btn-outline-dark btn-sm">Register</a>
+        </div>
+    </div>
+
+    <!-- MAP -->
+    <div id="map"></div>
+
+    <!-- ACCOUNT SIDEBAR -->
+    <div id="accountSidebar">
+        <div class="sidebar-header"><h5>Account</h5></div>
+        <div class="sidebar-content">
+            <p><strong>Welcome,</strong> <span id="sidebarName"></span></p>
+            <p><strong>Role:</strong> <span id="sidebarRole"></span></p>
+            <p><strong>Username:</strong> <span id="sidebarUsername"></span></p>
+        </div>
+        <div class="sidebar-footer">
+            <button class="btn btn-danger w-100" id="logoutBtn">Logout</button>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <div id="jeepSidebar">
+        <h5 id="terminalTitle">Available Jeepneys</h5>
+        <ul id="jeepList"></ul>
+    </div>
+
+    <script>
+        // --- ICONS ---
+        const terminalIcon = L.icon({
+            iconUrl: 'terminal.png',
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -32]
+        });
+
+        const jeepneyIcon = L.icon({
+            iconUrl: 'jeepney.png',
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
+        });
+
+        const userIcon = L.icon({
+            iconUrl: 'user.png',
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+        });
+
+        // --- 1. SAMPLE TERMINALS STORED IN SYSTEM ---
+        const terminals = [
+            { name: "Irisan Terminal", lat: 16.4321, lng: 120.5751 },
+            { name: "Trancoville Terminal", lat: 16.4258, lng: 120.6001 },
+            { name: "Aurora Hill Terminal", lat: 16.4190, lng: 120.6130 },
+            { name: "Loakan Terminal", lat: 16.3920, lng: 120.6190 },
+            { name: "Dangwa Terminal", lat: 16.4183, lng: 120.5962 }
+        ];
+
+        // --- 2. INITIALIZE MAP ---
+        const map = L.map("map").setView([0, 0], 15);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "© OpenStreetMap contributors"
+        }).addTo(map);
+        const marker = L.marker([0, 0], { icon: userIcon }).addTo(map);
+
+        terminals.forEach(t => {
+            const terminalMarker = L.marker([t.lat, t.lng], { icon: terminalIcon })
+                .addTo(map)
+                .bindPopup(`<strong>${t.name}</strong>`);
+
+            terminalMarker.on("click", () => {
+                showJeepSidebar(t.name);
+            });
+            });
+
+        // Auto-locate user
+        // Auto-locate user and update every 30 seconds
+        if (navigator.geolocation) {
+            function updateLocation() {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        const lat = pos.coords.latitude;
+                        const lng = pos.coords.longitude;
+
+                        marker.setLatLng([lat, lng]);
+                        map.setView([lat, lng], 15);
+
+                        console.log("Location updated:", lat, lng); // optional debug
+                    },
+                    (err) => {
+                        console.error("Geolocation error:", err.message);
+                    },
+                    { enableHighAccuracy: true }
+                );
+            }
+
+            // Update immediately on page load
+            updateLocation();
+
+            // Then update every 30 seconds (30000 ms)
+            setInterval(updateLocation, 30000);
+        }
+
+
+        // --- 3. SEARCH SYSTEM WITH HISTORY ---
+        const searchInput = document.getElementById("terminalSearch");
+        const suggestionsList = document.getElementById("suggestions");
+        let searchHistory = JSON.parse(localStorage.getItem("searchHistory") || "[]");
+
+        function updateSuggestions() {
+            const query = searchInput.value.toLowerCase();
+            suggestionsList.innerHTML = "";
+            if (query.length === 0) return;
+
+            const results = terminals.filter(t => t.name.toLowerCase().includes(query));
+            results.forEach(t => {
+                let li = document.createElement("li");
+                li.classList.add("list-group-item");
+                li.style.cursor = "pointer";
+                li.textContent = t.name;
+
+                li.addEventListener("click", () => {
+                    map.setView([t.lat, t.lng], 17);
+                    L.marker([t.lat, t.lng]).addTo(map);
+                    searchInput.value = t.name;
+                    suggestionsList.innerHTML = "";
+                    saveSearch(t.name);
+                });
+
+                suggestionsList.appendChild(li);
+            });
+        }
+
+        function saveSearch(name) {
+            searchHistory.push({ name, date: new Date().toLocaleString() });
+            localStorage.setItem("searchHistory", JSON.stringify(searchHistory));
+        }
+
+        searchInput.addEventListener("input", updateSuggestions);
+
+        // --- 4. USER MANAGEMENT (sidebar) ---
+        let currentUser = null;
+        const storedUser = localStorage.getItem("currentUser");
+        if (storedUser) { currentUser = JSON.parse(storedUser); showAccountSidebar(); }
+
+        function showAccountSidebar() {
+            document.getElementById("sidebarName").textContent = currentUser.fullName;
+            document.getElementById("sidebarRole").textContent = currentUser.role;
+            document.getElementById("sidebarUsername").textContent = currentUser.username;
+            document.getElementById("accountSidebar").classList.add("show");
+            document.querySelector('a[href="login.html"]').style.display = "none";
+            document.querySelector('a[href="register.html"]').style.display = "none";
+        }
+
+        function hideAccountSidebar() {
+            document.getElementById("accountSidebar").classList.remove("show");
+            document.querySelector('a[href="login.html"]').style.display = "inline-block";
+            document.querySelector('a[href="register.html"]').style.display = "inline-block";
+            currentUser = null;
+            localStorage.removeItem("currentUser");
+        }
+
+        document.getElementById("logoutBtn").addEventListener("click", hideAccountSidebar);
+
+        let jeepMarker = L.marker([16.4025, 120.5965], {
+            icon: jeepneyIcon
+        }).addTo(map).bindPopup("Jeepney #12");
+
+        function showJeepSidebar(terminalName) {
+
+            document.getElementById("terminalTitle").textContent = "Jeepneys at " + terminalName;
+
+            const jeepList = document.getElementById("jeepList");
+            jeepList.innerHTML = "";
+
+            const now = new Date();
+            const jeepTimes = [5, 10, 15, 20];
+
+            jeepTimes.forEach((mins, index) => {
+
+                const etaTime = new Date(now.getTime() + mins * 60000);
+
+                const formattedTime = etaTime.toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+                });
+
+                const li = document.createElement("li");
+
+                li.innerHTML = `
+                <div class="jeep-card">
+                    <img src="jeepney.png" alt="Jeepney">
+                    <div class="jeep-info">
+                    <strong>Jeep #${index + 1}</strong><br>
+                    ETA: ${formattedTime}
+                    </div>
+                </div>
+                `;
+
+                jeepList.appendChild(li);
+            });
+
+            document.getElementById("jeepSidebar").classList.add("show");
+        }
+        
+        map.on("click", () => {
+            document.getElementById("jeepSidebar").classList.remove("show");
+        });
+    </script>
+</body>
+</html>
