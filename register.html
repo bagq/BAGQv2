@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Register - BAG-Q</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-image: url('https://via.placeholder.com/1920x1080?text=Register+Background');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background: url('baguio.png') no-repeat center center fixed;
+    }
+
+    .card-auth {
+      width: 420px;
+      background: rgba(255,255,255,0.95);
+      border-radius: 12px;
+      box-shadow: 0 6px 30px rgba(0,0,0,0.2);
+      padding: 1.5rem;
+    }
+
+    #driverFields { display: none; }
+  </style>
+</head>
+<body>
+
+  <div class="card-auth">
+    <h4 class="mb-3 text-center">BAG-Q — Register</h4>
+
+    <form id="registerForm">
+      <div class="mb-3">
+        <label class="form-label">Full Name</label>
+        <input id="registerFullName" class="form-control" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Role</label>
+        <select id="registerRole" class="form-select" required>
+          <option value="">Select Role</option>
+          <option value="commuter">Commuter</option>
+          <option value="driver">Jeepney Driver</option>
+          <option value="dispatcher">Dispatcher</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input id="registerUsername" class="form-control" required>
+        <small id="usernameHint" class="text-muted">For drivers and dispatchers, username must start with the designated prefix.</small>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input id="registerEmail" type="email" class="form-control" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input id="registerPassword" type="password" class="form-control" required>
+      </div>
+
+      <div id="driverFields" class="mb-3">
+        <label class="form-label">Driver's License Photo</label>
+        <input id="driversLicense" type="file" class="form-control" accept="image/*">
+        <label class="form-label mt-2">Authority to Drive Photo</label>
+        <input id="authorityToDrive" type="file" class="form-control" accept="image/*">
+      </div>
+
+      <div id="registerError" class="text-danger mb-3" style="display:none;"></div>
+
+      <button class="btn btn-success w-100" type="submit">Register</button>
+
+      <p class="text-center mt-3 mb-0">Already have an account? <a href="login.html">Login here</a></p>
+    </form>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const registerRoleSelect = document.getElementById("registerRole");
+    const registerUsernameInput = document.getElementById("registerUsername");
+    const usernameHint = document.getElementById("usernameHint");
+    const driverFields = document.getElementById("driverFields");
+
+    registerRoleSelect.addEventListener("change", () => {
+      const role = registerRoleSelect.value;
+      const email = document.getElementById("registerEmail").value;
+      const emailPrefix = email ? email.split('@')[0] : '';
+
+      if (role === "driver") {
+        driverFields.style.display = "block";
+        registerUsernameInput.value = "driver_" + emailPrefix;
+        usernameHint.textContent = "Username must start with 'driver_'.";
+      } else if (role === "dispatcher") {
+        driverFields.style.display = "none";
+        registerUsernameInput.value = "dispatcher_" + emailPrefix;
+        usernameHint.textContent = "Username must start with 'dispatcher_'.";
+      } else {
+        driverFields.style.display = "none";
+        registerUsernameInput.value = "";
+        usernameHint.textContent = "Enter your desired username.";
+      }
+    });
+
+    registerUsernameInput.addEventListener("input", () => {
+      const role = registerRoleSelect.value;
+      const currentValue = registerUsernameInput.value;
+      if (role === "driver" && !currentValue.startsWith("driver_")) {
+        registerUsernameInput.value = "driver_" + currentValue.replace(/^driver_/, '');
+      } else if (role === "dispatcher" && !currentValue.startsWith("dispatcher_")) {
+        registerUsernameInput.value = "dispatcher_" + currentValue.replace(/^dispatcher_/, '');
+      }
+    });
+
+    document.getElementById("registerEmail").addEventListener("input", () => {
+      const role = registerRoleSelect.value;
+      const email = document.getElementById("registerEmail").value;
+      const emailPrefix = email.split('@')[0] || '';
+      if (role === "driver") {
+        const suffix = registerUsernameInput.value.replace(/^driver_/, '');
+        registerUsernameInput.value = "driver_" + emailPrefix + (suffix ? '_' + suffix : '');
+      } else if (role === "dispatcher") {
+        const suffix = registerUsernameInput.value.replace(/^dispatcher_/, '');
+        registerUsernameInput.value = "dispatcher_" + emailPrefix + (suffix ? '_' + suffix : '');
+      }
+    });
+
+    document.getElementById("registerForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const fullName = document.getElementById("registerFullName").value;
+      const role = document.getElementById("registerRole").value;
+      const username = document.getElementById("registerUsername").value;
+      const email = document.getElementById("registerEmail").value;
+      const password = document.getElementById("registerPassword").value;
+
+      let users = JSON.parse(localStorage.getItem("users") || "[]");
+      const existingUser = users.find(u => u.username === username || u.email === email);
+      if (existingUser) {
+        const el = document.getElementById("registerError");
+        el.textContent = "Username or email already registered.";
+        el.style.display = "block";
+        return;
+      }
+
+      users.push({ fullName, role, username, email, password });
+      localStorage.setItem("users", JSON.stringify(users));
+      alert("Registration successful!");
+      window.location.href = "login.html";
+    });
+  </script>
+</body>
+</html>
